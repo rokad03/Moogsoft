@@ -1,0 +1,127 @@
+---
+- name: Prerequisite for Moogsoft Installation
+  hosts: webserver
+  become: yes
+  become_user: root
+  vars:
+    moogsoft_username: "moogeng"
+    moogsoft_password: "PcLDc9dGEa2KRu9N"
+    AIOPS_USER: "moogeng"
+    AIOPS_PASS: "PcLDc9dGEa2KRu9N"
+    java_version: "11.0.22.0.7"
+    LIMITS_NPROC_CONF: /etc/security/limits.d/00_moogsoft.conf
+  tasks:
+    - name: Create Moogsoft repository file
+      ansible.builtin.copy:
+        dest: /etc/yum.repos.d/moogsoft-v9.repo
+        content: |
+          [moogsoft-v9]
+          name=moogsoft-v9
+          baseurl=https://{{ moogsoft_username }}:{{ moogsoft_password }}@speedy.moogsoft.com/v9/repo
+          enabled=1
+          gpgcheck=0
+          sslverify=0
+        mode: '0644'
+
+    - name: Install Rabbitmq Erlang Package
+      ansible.builtin.yum:
+        name: "https://github.com/rabbitmq/erlang-rpm/releases/download/v26.0.1/erlang-26.0.1-1.el8.x86_64.rpm"
+        state: present
+
+    - name: Download and execute RabbitMQ repository setup script
+      ansible.builtin.shell: curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | bash
+
+    - name: Create the Nginx yum Repo file
+      ansible.builtin.copy:
+        dest: /etc/yum.repos.d/nginx.repo
+        content: |
+          name=nginx repo
+          baseurl=http://nginx.org/packages/rhel/8/\$basearch/
+          gpgcheck=0
+          enabled=1
+          module_hotfixes=1
+          [nginx-mainline]
+          name=nginx mainline repo
+          baseurl=http://nginx.org/packages/mainline/rhel/8/\$basearch/
+          gpgcheck=0
+          enabled=1
+          gpgkey=https://nginx.org/keys/nginx_signing.key
+          module_hotfixes=1
+
+    - name: Clean YUM cache
+      ansible.builtin.command: yum clean all
+
+    - name: Update nss and openssl packages
+      ansible.builtin.yum:
+        name:
+          - nss
+          - openssl
+        state: latest
+
+    - name: Install Java 11 packages
+      yum:
+        name:
+          - "java-11-openjdk-headless-{{ java_version }}"
+          - "java-11-openjdk-{{ java_version }}"
+          - "java-11-openjdk-devel-{{ java_version }}"
+        state: present
+
+    - name: Install EPEL Yum Repository and enable extra package 
+      yum:
+        name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm"
+        state: present
+
+    - name: Checking epel.repo is exists or not
+      stat:
+        path: /etc/yum.repos.d/epel.repo
+      register: epel_file
+
+    - name: Stop execution if EPEL is missing
+      fail:
+        msg: "EPEL repository is NOT installed! Exiting..."
+      when: not epel_file.stat.exists
+  
+    #- name: Check for conflicting MySQL libraries
+    #  command: rpm -q --whatprovides mysql-libs
+    #  register: mysql_conflict
+    #  ignore_errors: yes
+    #  changed_when: false
+
+    #- name: Remove conflicting MySQL libraries if found
+    #  yum:
+    #    name: "{{ mysql_conflict.stdout_lines }}"
+    #    state: absent
+    #  when: mysql_conflict.stdout_lines | length > 0
+
+   # - name: Download Percona install script
+   #   get_url:
+   #   url: "https://{{ AIOPS_USER }}:{{ AIOPS_PASS }}@speedy.moogsoft.com/v9/install_percona_nodes.sh"
+   #  dest: "/tmp/install_percona_nodes.sh"
+   #     mode: '0755'
+      #no_log: true  # Hide sensitive data in logs
+
+   # - name: Make script executable
+   #   file:
+   #     path: "/tmp/install_percona_nodes.sh"
+   #     mode: '0755'
+
+   # - name: Run Percona install script
+   #   command: bash get_percona_script.sh
+
+    - name: Download script using curl
+      shell: curl -L -o /home/devuser/install_percona_nodes.sh https://$AIOPS_USER:$AIOPS_PASS@speedy.moogsoft.com/v9/install_percona_nodes.sh
+      environment:
+       AIOPS_USER: "{{ AIOPS_USER }}"
+       AIOPS_PASS: "{{ AIOPS_PASS }}"
+ 
+
+    - name: Disable SE linux
+      ansible.builtin.shell:
+       cmd: setenforce 0
+
+    - name: Configure userlimits for RHEL8
+      ansible.builtin.shell: |
+         sudo bash -c "echo \"moogsoft   hard   nproc   65536\" >> {{ LIMITS_NPROC_CONF }}"
+         sudo bash -c "echo \"moogsoft   hard   nofile   65536\" >> {{ LIMITS_NPROC_CONF }}"
+         sudo bash -c "echo \"moogsoft   soft   nproc   65536\" >> {{ LIMITS_NPROC_CONF }}"
+         sudo bash -c "echo \"moogsoft   soft   nofile   65536\" >> {{ LIMITS_NPROC_CONF }}"

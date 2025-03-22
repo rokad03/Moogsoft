@@ -1,0 +1,95 @@
+---
+- name: Moogsoft RPM installation
+  hosts: webserver
+  become: yes
+  become_user: root
+  vars:
+     VERSION: 9.0.1
+     zone_name: moog_h
+  tasks:
+   - name: Install the Moogsoft Onprem RPM packages
+     yum:
+      name:
+         - moogsoft-server-{{ VERSION }} 
+         - moogsoft-server-{{ VERSION }} 
+         - moogsoft-db-{{ VERSION }} 
+         - moogsoft-utils-{{ VERSION }} 
+         - moogsoft-search-{{ VERSION }} 
+         - moogsoft-ui-{{ VERSION }} 
+         - moogsoft-common-{{ VERSION }} 
+         - moogsoft-mooms-{{ VERSION }} 
+         - moogsoft-integrations-{{ VERSION }} 
+         - moogsoft-integrations-ui-{{ VERSION }} 
+      state: present
+
+   - name: Set the bashrc of root user
+     ansible.builtin.blockinfile:
+           path: ~/.bashrc
+           marker: "# ANSIBLE MANAGED BLOCK"
+           block: |
+                export MOOGSOFT_HOME=/usr/share/moogsoft
+                export APPSERVER_HOME=/usr/share/apache-tomcat
+                export JAVA_HOME=/usr/java/latest
+                export PATH=$PATH:$MOOGSOFT_HOME/bin:$MOOGSOFT_HOME/bin/utils 
+
+   - name: Set the source bashrc
+     ansible.builtin.shell:
+       cmd: source ~/.bashrc
+ 
+   - name: Disable mysql module
+     ansible.builtin.shell:
+       cmd: dnf module disable mysql -y
+
+   - name: Install Percona Script
+     shell: bash install_percona_nodes.sh -d -p -i 10.50.10.46
+     args:
+       chdir: /home/devuser
+ 
+   - name: Run moog_init script
+     expect:
+       command: "/usr/share/moogsoft/bin/utils/moog_init.sh -I {{ zone_name }} -u root"
+       responses:
+          "Press <return> to continue...": "\n"
+          "Enter password:": "\n"
+          "Do you accept the End User License Agreement (EULA)?": "yes"
+          "Press <return> to continue...": "\n"
+          "Do you wish to change the default port ranges?": "yes"
+          #"Enter port range maximum to be used or press return to accept the default \[51000\]": ""
+          # "Enter port range maximum to be used or press return to accept the default \[51000\]": " "
+          # "Enter port range minimum to be used or press return to accept the default \[50000\]": " "
+          # "Enter port range maximum to be used or press return to accept the default [51000]": " "
+          "Are you sure? [y/n]": "y"
+          "Do you wish to change this?": "y"
+          "Enter hostname to be used or press return to accept the default rhel8-50-8-112": "10.50.8.112"
+          "Enter the public URL for the server": "10.50.8.112"
+          "Enter password for the root database user": "\n"
+          "Please input the MySQL password to use with username root...": "\n"
+          "Press <CR> to continue ...": "\n"
+       timeout: 9000
+     #async: 6000
+     #poll: 600
+     delay: 1
+       
+
+#   - name: Run moog_init script
+#     shell: |
+#     echo -e "yes\nyes\n10.50.8.112\n" | /usr/share/moogsoft/bin/utils/moog_init.sh -I {{ zone_name }} -u root
+
+#   - name: Run Moogsoft initialization using shell
+#     ansible.builtin.shell: |
+#      { sleep 2; echo "y"; sleep 2; echo "yes"; sleep 2; echo "yes"; sleep 2; echo "y"; sleep 2;
+#        echo "10.50.8.112"; sleep 2; echo ""; sleep 2; echo ""; sleep 2; echo "10.50.8.112"; sleep 2;
+#        echo ""; sleep 2; echo ""; sleep 2; echo ""; sleep 2; echo ""; sleep 2; echo "" } | 
+#        /usr/share/moogsoft/bin/utils/moog_init.sh -I moog_h -u root
+#     args:
+#     executable: /bin/bash
+#     async: 600
+#     poll: 10
+#     register: result
+
+#   - debug:
+#     var: result.stdout_lines
+
+ 
+               
+     

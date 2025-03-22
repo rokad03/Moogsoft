@@ -1,0 +1,55 @@
+---
+- name: test yml
+  hosts: webserver
+  become: yes
+  become_user: root
+  tasks:
+   - name: Run Moogsoft initialization using shell
+     ansible.builtin.shell: |
+       sleep 2; echo "y"; 
+       sleep 2; echo "yes"; 
+       sleep 2; echo "yes"; 
+       sleep 2; echo "y"; 
+       sleep 2; echo "10.50.8.112"; 
+       sleep 2; echo ""; 
+       sleep 2; echo ""; 
+       sleep 2; echo "10.50.8.112"; 
+       sleep 2; echo ""; 
+       sleep 2; echo ""; 
+       sleep 2; echo ""; 
+       sleep 2; echo ""; 
+       /usr/share/moogsoft/bin/utils/moog_init.sh -I moog_h -u root
+     args:
+       executable: /bin/bash
+     async: 600   # Run for up to 10 minutes
+     #poll: 10     # Check every 10 seconds
+     register: result
+
+   - debug:
+       var: result.stdout_lines
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
