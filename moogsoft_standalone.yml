@@ -21,7 +21,24 @@
           enabled=1
           gpgcheck=0
           sslverify=0
-        mode: '0644'
+
+    - name: Create the Nginx yum Repo file
+      ansible.builtin.copy:
+        dest: /etc/yum.repos.d/nginx.repo
+        content: |
+          [nginx]
+          name=nginx repo
+          baseurl=http://nginx.org/packages/rhel/8/$basearch/
+          gpgcheck=0
+          enabled=1
+          module_hotfixes=1
+          [nginx-mainline]
+          name=nginx mainline repo
+          baseurl=http://nginx.org/packages/mainline/rhel/8/$basearch/
+          gpgcheck=0
+          enabled=1
+          gpgkey=https://nginx.org/keys/nginx_signing.key
+          module_hotfixes=1
 
     - name: Install Rabbitmq Erlang Package
       ansible.builtin.yum:
@@ -31,22 +48,23 @@
     - name: Download and execute RabbitMQ repository setup script
       ansible.builtin.shell: curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | bash
 
-    - name: Create the Nginx yum Repo file
-      ansible.builtin.copy:
-        dest: /etc/yum.repos.d/nginx.repo
-        content: |
-          name=nginx repo
-          baseurl=http://nginx.org/packages/rhel/8/\$basearch/
-          gpgcheck=0
-          enabled=1
-          module_hotfixes=1
-          [nginx-mainline]
-          name=nginx mainline repo
-          baseurl=http://nginx.org/packages/mainline/rhel/8/\$basearch/
-          gpgcheck=0
-          enabled=1
-          gpgkey=https://nginx.org/keys/nginx_signing.key
-          module_hotfixes=1
+    #- name: Create the Nginx yum Repo file
+    #  ansible.builtin.copy:
+    #    dest: /etc/yum.repos.d/nginx.repo
+    #    content: |
+    #      [nginx]
+    #      name=nginx repo
+    #      baseurl=http://nginx.org/packages/rhel/8/$basearch/
+    #      gpgcheck=0
+    #      enabled=1
+    #      module_hotfixes=1
+    #      [nginx-mainline]
+    #      name=nginx mainline repo
+    #      baseurl=http://nginx.org/packages/mainline/rhel/8/$basearch/
+    #      gpgcheck=0
+    #      enabled=1
+    #      gpgkey=https://nginx.org/keys/nginx_signing.key
+    #      module_hotfixes=1
 
     - name: Clean YUM cache
       ansible.builtin.command: yum clean all
@@ -109,10 +127,7 @@
    #   command: bash get_percona_script.sh
 
     - name: Download script using curl
-      shell: curl -L -o /home/devuser/install_percona_nodes.sh https://$AIOPS_USER:$AIOPS_PASS@speedy.moogsoft.com/v9/install_percona_nodes.sh
-      environment:
-       AIOPS_USER: "{{ AIOPS_USER }}"
-       AIOPS_PASS: "{{ AIOPS_PASS }}"
+      shell: curl -L -o /home/devuser/install_percona_nodes.sh https://{{ AIOPS_USER }}:{{ AIOPS_PASS }}@speedy.moogsoft.com/v9/install_percona_nodes.sh
  
 
     - name: Disable SE linux

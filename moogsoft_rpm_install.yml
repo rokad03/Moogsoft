@@ -5,7 +5,7 @@
   become_user: root
   vars:
      VERSION: 9.0.1
-     zone_name: moog_h
+     zone_name: moog_vhosts
   tasks:
    - name: Install the Moogsoft Onprem RPM packages
      yum:
@@ -40,36 +40,53 @@
      ansible.builtin.shell:
        cmd: dnf module disable mysql -y
 
+   - name: Create MySQL user if not exists
+     shell: "id mysql || useradd mysql"
+
    - name: Install Percona Script
      shell: bash install_percona_nodes.sh -d -p -i 10.50.10.46
      args:
        chdir: /home/devuser
  
    - name: Run moog_init script
-     expect:
-       command: "/usr/share/moogsoft/bin/utils/moog_init.sh -I {{ zone_name }} -u root"
-       responses:
-          "Press <return> to continue...": "\n"
-          "Enter password:": "\n"
-          "Do you accept the End User License Agreement (EULA)?": "yes"
-          "Press <return> to continue...": "\n"
-          "Do you wish to change the default port ranges?": "yes"
+     #expect:
+     # command: bash /usr/share/moogsoft/bin/utils/moog_init.sh -I mn -u root -q --accept-eula
+     # responses:
+     #  "Password:": ""
+     #timeout: 600
+     shell: |
+      bash /usr/share/moogsoft/bin/utils/moog_init.sh -I mn -u root -q --accept-eula <<EOF
+      EOF
+    
+        #responses:
+        #  "Press <return> to continue...": "\n"
+        #  "Enter password:": "\n"
+        #  "Do you accept the End User License Agreement (EULA)?": "yes"
+        #  "Press <return> to continue...": "\n"
+        #  "Do you wish to change the default port ranges?": "yes"
           #"Enter port range maximum to be used or press return to accept the default \[51000\]": ""
           # "Enter port range maximum to be used or press return to accept the default \[51000\]": " "
           # "Enter port range minimum to be used or press return to accept the default \[50000\]": " "
           # "Enter port range maximum to be used or press return to accept the default [51000]": " "
-          "Are you sure? [y/n]": "y"
-          "Do you wish to change this?": "y"
-          "Enter hostname to be used or press return to accept the default rhel8-50-8-112": "10.50.8.112"
-          "Enter the public URL for the server": "10.50.8.112"
-          "Enter password for the root database user": "\n"
-          "Please input the MySQL password to use with username root...": "\n"
-          "Press <CR> to continue ...": "\n"
-       timeout: 9000
+        #  "Are you sure? [y/n]": "y"
+        #  "Do you wish to change this?": "y"
+        #  "Enter hostname to be used or press return to accept the default rhel8-50-8-112": "10.50.8.112"
+        #  "Enter the public URL for the server": "10.50.8.112"
+        #  "Enter password for the root database user": "\n"
+        #  "Please input the MySQL password to use with username root...": "\n"
+        #  "Press <CR> to continue ...": "\n"
+       #timeout: 9000
      #async: 6000
      #poll: 600
-     delay: 1
-       
+     #delay: 1
+    
+   - name: Modify webhost entry
+     ansible.builtin.lineinfile:
+       path: /usr/share/moogsoft/config/servlets.conf  # Update this with the actual file path
+       search_string: 'webhost : "root@rhel8-50-9-166"'
+       line: 'webhost : "10.50.8.112"'
+    
+   
 
 #   - name: Run moog_init script
 #     shell: |
@@ -90,6 +107,20 @@
 #   - debug:
 #     var: result.stdout_lines
 
- 
+   - name: Restart the moogfamrd
+     shell:
+      cmd: systemctl restart moogfarmd
+
+   - name: Ensure JVM heap size is set for RPM installations
+     lineinfile:
+        path: /etc/opensearch/jvm.options.d/moog.options
+        line: "{{ item }}"
+        state: present
+        create: yes
+     loop:
+        - "-Xms4g"
+        - "-Xmx4g" 
                
-     
+   - name: Restart the opensearch due to chnage in heap size
+     shell:
+       cmd: systemctl restart opensearch 
